@@ -1,10 +1,20 @@
-GOOS=linux
-GOARCH=amd64
+export GOOS=linux
+export GOARCH=amd64
+
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    CYGWIN*|MINGW*)     machine=Windows;;
+    Linux*|Darwin*|*)   machine=Unix
+esac
 
 echo "building for $GOOS-$GOARCH"
 
-go build -o dist/createschema/main lambdas/createschema/main.go
-zip dist/createschema/main.zip dist/createschema/main
+go build -o bin/hellolambda lambdas/hellolambda/main.go
 
-go build -o dist/hellolambda/main lambdas/hellolambda/main.go
-zip dist/hellolambda/main.zip dist/hellolambda/main
+echo "zipping on $machine"
+
+if [ $machine = "Windows" ]; then
+    build-lambda-zip -o dist/hellolambda.zip bin/hellolambda
+else
+    zip -j dist/hellolambda.zip bin/hellolambda
+fi

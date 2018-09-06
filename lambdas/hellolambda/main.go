@@ -1,4 +1,4 @@
-package hellolambda
+package main
 
 import (
 	"context"
