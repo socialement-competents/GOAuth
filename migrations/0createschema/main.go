@@ -13,7 +13,6 @@ func main() {
 		log.Println("connecting to the database failed: ", err)
 		return
 	}
-
 	defer connection.Close()
 
 	query := `
