@@ -29,7 +29,7 @@ for lambda in $lambdas
 do
     echo ""
     echo "building $lambda"
-    go build -o bin/$lambda lambdas/$lambda/main.go
+    go build -o bin/$lambda lambdas/$lambda/main.go || exit 1
     
     echo "zipping $lambda"
     if [ $machine = "Windows" ]; then
