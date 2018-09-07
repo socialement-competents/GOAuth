@@ -12,7 +12,20 @@ echo "building for $GOOS-$GOARCH on $machine"
 rm -rf bin dist
 mkdir bin dist
 
-for lambda in `ls lambdas`
+lambdas=""
+
+while [ "$1" != "" ]
+do
+    lambdas="$lambdas $1"
+    shift
+done
+
+if [ "$lambdas" == "" ]
+then
+    lambdas=$(ls lambdas)
+fi
+
+for lambda in $lambdas
 do
     echo ""
     echo "building $lambda"
@@ -27,11 +40,11 @@ do
         zip -j dist/$lambda.zip bin/$lambda
     fi
 
-    # Add the /dist subfolder to the .zip if it exists
-    [ -e lambdas/$lambda/dist ] && \
-    echo "adding dist/" && \
+    # Add the /public subfolder to the .zip if it exists
+    [ -e lambdas/$lambda/public ] && \
+    echo "adding public/" && \
     cd lambdas/$lambda && \
-    zip -ru ../../dist/$lambda.zip dist && \
+    zip -ru ../../dist/$lambda.zip public && \
     cd ../..
 
     echo "built dist/$lambda.zip"
