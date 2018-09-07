@@ -9,6 +9,9 @@ esac
 
 echo "building for $GOOS-$GOARCH on $machine"
 
+rm -rf bin dist
+mkdir bin dist
+
 for lambda in `ls lambdas`
 do
     echo ""
