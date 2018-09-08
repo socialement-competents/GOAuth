@@ -38,7 +38,7 @@ https://api.github.com/user with the token in scope
 
 **Requirements**
 
-You need to install Go to run this repo.
+You need to install Go to run this repo.  
 You also need a PostgreSQL, local or remote (we used https://elephantsql.com)
 
 **Environment**
@@ -83,3 +83,6 @@ To build specific lambdas, add arguments: `./build.sh lambda1 lambda2`.
 
 Linux/amd64 executables will be built in `./bin`, and the ready-for-deployment
 `.zip` file will be put in `./dist`.
+
+
+>NOTE: The lambdas are meant to be served with a proxy API Gateway method.
