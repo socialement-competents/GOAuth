@@ -4,8 +4,7 @@ import "time"
 
 // User : an application user
 type User struct {
-	ID        int64     `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`
+	ID        int       `json:"id" db:"id"`
 	LastLogin time.Time `json:"last_login" db:"last_login"`
 	Created   time.Time `json:"created" db:"created"`
 	*GHUser
@@ -13,10 +12,11 @@ type User struct {
 
 // GHUser : a GitHub user
 type GHUser struct {
-	Login    string `json:"login" db:"login"`
-	Image    string `json:"avatar_url" db:"image"`
-	Blog     string `json:"blog" db:"blog"`
-	Location string `json:"location" db:"location"`
-	Email    string `json:"email" db:"email"`
 	Bio      string `json:"bio" db:"bio"`
+	Blog     string `json:"blog" db:"blog"`
+	Email    string `json:"email" db:"email"`
+	Image    string `json:"avatar_url" db:"image"`
+	Location string `json:"location" db:"location"`
+	Login    string `json:"login" db:"login"`
+	Name     string `json:"name" db:"name"`
 }

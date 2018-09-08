@@ -27,6 +27,6 @@ func main() {
 	_, err = client.Connection.Exec(query)
 
 	if err != nil {
-		log.Print("creating the table failed: ", err)
+		log.Print("migration failed: ", err)
 	}
 }
