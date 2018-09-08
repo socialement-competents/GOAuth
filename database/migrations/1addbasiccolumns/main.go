@@ -6,7 +6,7 @@ import (
 	"github.com/socialement-competents/goauth/database"
 )
 
-// Create a basic User table
+// Add some useful fields to the user table
 func main() {
 	connection, err := database.Connect()
 	if err != nil {
@@ -16,13 +16,11 @@ func main() {
 	defer connection.Close()
 
 	query := `
-		CREATE TABLE IF NOT EXISTS Users (
-			id SERIAL PRIMARY KEY NOT NULL,
-			email VARCHAR (255) UNIQUE NOT NULL,
-			login VARCHAR (255) NOT NULL,
-			created TIMESTAMP,
-			last_login TIMESTAMP
-		)
+		ALTER TABLE Users
+		ADD COLUMN image VARCHAR(500),
+		ADD COLUMN blog VARCHAR(500),
+		ADD COLUMN location VARCHAR(500),
+		ADD COLUMN bio TEXT;
 	`
 
 	_, err = connection.Exec(query)
