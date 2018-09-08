@@ -10,7 +10,7 @@ import (
 )
 
 func runFile(filename string, client *database.Client) {
-	_, err := ioutil.ReadFile(filename)
+	query, err := ioutil.ReadFile(filename)
 	if err != nil {
 		panic(err)
 	}
