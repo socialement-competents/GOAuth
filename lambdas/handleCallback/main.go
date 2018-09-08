@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -62,11 +63,19 @@ func RegisterUser(ctx context.Context, request events.APIGatewayProxyRequest) ev
 		)
 	}
 
-	user, err := getUser(token)
+	ghuser, err := getUser(token)
 	if err != nil {
 		return respond(
 			http.StatusInternalServerError,
 			fmt.Sprintf("error getting the user from GH: %v", err),
+		)
+	}
+
+	user, err := checkIfExists(ghuser)
+	if err != nil {
+		return respond(
+			http.StatusInternalServerError,
+			fmt.Sprintf("error check if the user exists: %v", err),
 		)
 	}
 
@@ -146,6 +155,10 @@ func checkStatusCode(resp *http.Response) error {
 	}
 
 	return nil
+}
+
+func checkIfExists(user *models.GHUser) (*models.User, error) {
+	return nil, errors.New("NOT IMPLEMENTED")
 }
 
 func respond(code int, body interface{}) events.APIGatewayProxyResponse {
