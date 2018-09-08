@@ -28,7 +28,7 @@ the GitHub API.
 [Building a Basic Auth Server](https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66)  
 [Go Lambdas](https://github.com/eawsy/aws-lambda-go)
 
-[GitHub API doc](https://developer.github.com/v3/)
+[GitHub API doc](https://developer.github.com/v3/)  
 [GitHub OAuth flow](https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps/)
 
 GitHub user API : https://api.github.com/users/:username or 
