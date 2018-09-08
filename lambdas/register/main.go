@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,10 +10,11 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/socialement-competents/goauth/models"
 )
 
-// GHResponse : payload sent by the GitHub API
-type GHResponse struct {
+// GHPayload : payload sent by the GitHub API
+type GHPayload struct {
 	Code string `json:"code"`
 }
 
@@ -26,130 +25,50 @@ type GHToken struct {
 	Scope       string `json:"scope"`
 }
 
-// RegisterUser : registers an user with GitHub
-func RegisterUser(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	clientID := os.Getenv("GH_ID")
-	clientSecret := os.Getenv("GH_SECRET")
+const accessTokenURL = "https://github.com/login/oauth/access_token?code=%s&client_id=%s&client_secret=%s"
+const userURL = "https://api.github.com/user"
 
+var client = &http.Client{}
+var clientID string
+var clientSecret string
+
+func init() {
+	clientID = os.Getenv("GH_ID")
+	clientSecret = os.Getenv("GH_SECRET")
+}
+
+// RegisterUser : registers an user with GitHub
+func RegisterUser(ctx context.Context, request events.APIGatewayProxyRequest) events.APIGatewayProxyResponse {
 	if clientID == "" {
-		return events.APIGatewayProxyResponse{
-			Body:       "$GH_ID should be set",
-			StatusCode: 400,
-		}, nil
+		return respond(http.StatusBadRequest, "$GH_ID should be set")
 	}
 	if clientSecret == "" {
-		return events.APIGatewayProxyResponse{
-			Body:       "$GH_SECRET should be set",
-			StatusCode: 400,
-		}, nil
+		return respond(http.StatusBadRequest, "$GH_ID should be set")
 	}
 
-	var payload GHResponse
-
-	data, err := json.Marshal(request.QueryStringParameters)
+	payload, err := getCode(&request)
 	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 400,
-		}, err
+		return respond(
+			http.StatusBadRequest,
+			fmt.Sprintf("error getting the code from the payload: %v", err),
+		)
 	}
 
-	err = json.Unmarshal(data, &payload)
+	token, err := getAcccessToken(payload)
 	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 400,
-		}, err
+		return respond(
+			http.StatusInternalServerError,
+			fmt.Sprintf("error getting the access token from GH: %v", err),
+		)
 	}
 
-	client := &http.Client{}
-
-	url := fmt.Sprintf("https://github.com/login/oauth/access_token?code=%s&client_id=%s&client_secret=%s", payload.Code, clientID, clientSecret)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	user, err := getUser(token)
 	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 500,
-		}, err
+		return respond(
+			http.StatusInternalServerError,
+			fmt.Sprintf("error getting the user from GH: %v", err),
+		)
 	}
-	req.Header.Add("Accept", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 500,
-		}, err
-	}
-
-	fmt.Println("resp token: ", resp)
-
-	if resp.StatusCode >= 400 {
-		errtxt := fmt.Sprintf("bad GitHub response: %s", resp.Status)
-		fmt.Println(errtxt)
-		return events.APIGatewayProxyResponse{
-			Body:       errtxt,
-			StatusCode: resp.StatusCode,
-		}, errors.New(errtxt)
-	} else if resp.StatusCode >= 300 {
-		errtxt := fmt.Sprintf("unexpected 3xx code: %s", resp.Status)
-		fmt.Println(errtxt)
-		return events.APIGatewayProxyResponse{
-			Body:       errtxt,
-			StatusCode: resp.StatusCode,
-		}, errors.New(errtxt)
-	}
-
-	var token GHToken
-
-	err = json.NewDecoder(resp.Body).Decode(&token)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 400,
-		}, err
-	}
-
-	fmt.Println(token)
-
-	req, err = http.NewRequest(http.MethodGet, "https://api.github.com/user", nil)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 500,
-		}, err
-	}
-	req.Header.Add("Authorization", fmt.Sprintf("token %s", token.AccessToken))
-
-	resp, err = client.Do(req)
-	if err != nil {
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 500,
-		}, err
-	}
-
-	fmt.Println("resp user: ", resp)
-
-	if resp.StatusCode >= 400 {
-		errtxt := fmt.Sprintf("bad GitHub response: %s", resp.Status)
-		fmt.Println(errtxt)
-		return events.APIGatewayProxyResponse{
-			Body:       errtxt,
-			StatusCode: resp.StatusCode,
-		}, errors.New(errtxt)
-	} else if resp.StatusCode >= 300 {
-		errtxt := fmt.Sprintf("unexpected 3xx code: %s", resp.Status)
-		fmt.Println(errtxt)
-		return events.APIGatewayProxyResponse{
-			Body:       errtxt,
-			StatusCode: resp.StatusCode,
-		}, errors.New(errtxt)
-	}
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(resp.Body)
-	user := buf.String()
 
 	log.Println(user)
 	fmt.Println(user)
@@ -157,10 +76,83 @@ func RegisterUser(ctx context.Context, request events.APIGatewayProxyRequest) (e
 	// check in the db if the user already exists
 	// insert or update data
 
+	return respond(http.StatusOK, user)
+}
+
+func getCode(request *events.APIGatewayProxyRequest) (*GHPayload, error) {
+	var payload GHPayload
+	data, err := json.Marshal(request.QueryStringParameters)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(data, &payload)
+	return &payload, err
+}
+
+func getAcccessToken(payload *GHPayload) (*GHToken, error) {
+	url := fmt.Sprintf(
+		accessTokenURL,
+		payload.Code,
+		clientID,
+		clientSecret,
+	)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = checkStatusCode(resp); err != nil {
+		return nil, err
+	}
+
+	var token GHToken
+	err = json.NewDecoder(resp.Body).Decode(&token)
+	return &token, err
+}
+
+func getUser(token *GHToken) (*models.GHUser, error) {
+	req, err := http.NewRequest(http.MethodGet, userURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("token %s", token.AccessToken))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = checkStatusCode(resp); err != nil {
+		return nil, err
+	}
+
+	var user models.GHUser
+	err = json.NewDecoder(resp.Body).Decode(&user)
+	return &user, err
+}
+
+func checkStatusCode(resp *http.Response) error {
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("bad GitHub response: %s", resp.Status)
+	} else if resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected return code: %s", resp.Status)
+	}
+
+	return nil
+}
+
+func respond(code int, body interface{}) events.APIGatewayProxyResponse {
 	return events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Body:       user,
-	}, err
+		StatusCode: code,
+		Body:       fmt.Sprint(body),
+	}
 }
 
 func main() {
