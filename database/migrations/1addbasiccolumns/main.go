@@ -8,12 +8,11 @@ import (
 
 // Add some useful fields to the user table
 func main() {
-	connection, err := database.Connect()
+	client, err := database.NewClient()
 	if err != nil {
 		log.Println("connecting to the database failed: ", err)
 		return
 	}
-	defer connection.Close()
 
 	query := `
 		ALTER TABLE Users
@@ -23,7 +22,7 @@ func main() {
 		ADD COLUMN bio TEXT;
 	`
 
-	_, err = connection.Exec(query)
+	_, err = client.Connection.Exec(query)
 
 	if err != nil {
 		log.Print("creating the table failed: ", err)

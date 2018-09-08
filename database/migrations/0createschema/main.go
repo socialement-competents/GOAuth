@@ -8,12 +8,11 @@ import (
 
 // Create a basic User table
 func main() {
-	connection, err := database.Connect()
+	client, err := database.NewClient()
 	if err != nil {
 		log.Println("connecting to the database failed: ", err)
 		return
 	}
-	defer connection.Close()
 
 	query := `
 		CREATE TABLE IF NOT EXISTS Users (
@@ -25,7 +24,7 @@ func main() {
 		)
 	`
 
-	_, err = connection.Exec(query)
+	_, err = client.Connection.Exec(query)
 
 	if err != nil {
 		log.Print("creating the table failed: ", err)
