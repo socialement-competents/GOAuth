@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/socialement-competents/goauth/database"
 	"github.com/socialement-competents/goauth/models"
 )
 
@@ -28,6 +28,7 @@ type GHToken struct {
 
 const accessTokenURL = "https://github.com/login/oauth/access_token?code=%s&client_id=%s&client_secret=%s"
 const userURL = "https://api.github.com/user"
+const githubProvider = "github"
 
 var client = &http.Client{}
 var clientID string
@@ -38,8 +39,8 @@ func init() {
 	clientSecret = os.Getenv("GH_SECRET")
 }
 
-// RegisterUser : registers an user with GitHub
-func RegisterUser(ctx context.Context, request events.APIGatewayProxyRequest) events.APIGatewayProxyResponse {
+// HandleCallback : handles the GitHub callback when calling "Connect with GitHub"
+func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	if clientID == "" {
 		return respond(http.StatusBadRequest, "$GH_ID should be set")
 	}
@@ -71,21 +72,64 @@ func RegisterUser(ctx context.Context, request events.APIGatewayProxyRequest) ev
 		)
 	}
 
-	user, err := checkIfExists(ghuser)
+	dbClient, err := database.NewClient()
 	if err != nil {
 		return respond(
 			http.StatusInternalServerError,
-			fmt.Sprintf("error check if the user exists: %v", err),
+			fmt.Sprintf("couldn't connect to the db: %v", err.Error()),
 		)
 	}
 
-	log.Println(user)
-	fmt.Println(user)
+	user, err := dbClient.GetUserByLogin(ghuser.Login, githubProvider)
+	exists := true
+	if err != nil {
+		// the user doesn't exist, we will have to create it
+		exists = false
+		user = &models.User{Provider: githubProvider}
+	}
 
-	// check in the db if the user already exists
-	// insert or update data
+	// Update our database with the newly fetched info
+	// (we don't query api.github.com every time, because of rate limits)
+	user.GHUser = ghuser
+	user.LastLogin = time.Now()
 
-	return respond(http.StatusOK, user)
+	var (
+		verb       string
+		statusCode int
+	)
+
+	if !exists {
+		// the user wasn't previously found, we need to create it
+		id, err := dbClient.CreateUser(user)
+		if err != nil {
+			return respond(
+				http.StatusInternalServerError,
+				fmt.Sprintf("creating the user failed: %v", err.Error()),
+			)
+		}
+		user.ID = id
+		verb = "created"
+		statusCode = http.StatusCreated
+	} else {
+		// otherwise update it
+		if err = dbClient.UpdateUser(user); err != nil {
+			return respond(
+				http.StatusInternalServerError,
+				fmt.Sprintf("updating the user failed: %v", err.Error()),
+			)
+		}
+		verb = "updated"
+		statusCode = http.StatusOK
+	}
+
+	jsonBytes, err := json.Marshal(user)
+	if err != nil {
+
+		text := fmt.Sprintf("user %s but could not format to JSON: %v", verb, err)
+		return respond(http.StatusAccepted, text)
+	}
+
+	return respond(statusCode, string(jsonBytes))
 }
 
 func getCode(request *events.APIGatewayProxyRequest) (*GHPayload, error) {
@@ -157,17 +201,13 @@ func checkStatusCode(resp *http.Response) error {
 	return nil
 }
 
-func checkIfExists(user *models.GHUser) (*models.User, error) {
-	return nil, errors.New("NOT IMPLEMENTED")
-}
-
-func respond(code int, body interface{}) events.APIGatewayProxyResponse {
+func respond(code int, payload interface{}) (events.APIGatewayProxyResponse, error) {
 	return events.APIGatewayProxyResponse{
 		StatusCode: code,
-		Body:       fmt.Sprint(body),
-	}
+		Body:       fmt.Sprint(payload),
+	}, nil
 }
 
 func main() {
-	lambda.Start(RegisterUser)
+	lambda.Start(HandleCallback)
 }

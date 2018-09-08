@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"time"
 
 	"github.com/socialement-competents/goauth/models"
@@ -9,8 +10,8 @@ import (
 // CreateUser inserts a new User in the database
 func (c *Client) CreateUser(u *models.User) (int, error) {
 	query := `
-		INSERT INTO Users (bio, blog, email, image, location, login, name, last_login, created)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (bio, blog, email, image, location, login, name, provider, last_login, created)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id;
 	`
 
@@ -26,6 +27,7 @@ func (c *Client) CreateUser(u *models.User) (int, error) {
 		u.Location,
 		u.Login,
 		u.Name,
+		u.Provider,
 		u.LastLogin,
 		u.Created,
 	).Scan(&id)
@@ -35,9 +37,9 @@ func (c *Client) CreateUser(u *models.User) (int, error) {
 // UpdateUser will update a row from its ID
 func (c *Client) UpdateUser(u *models.User) error {
 	query := `
-		UPDATE Users
+		UPDATE users
 		SET	
-			bio = $2
+			bio = $2,
 			blog = $3,
 			email = $4,
 			image = $5,
@@ -65,14 +67,19 @@ func (c *Client) UpdateUser(u *models.User) error {
 }
 
 // GetUserByLogin selects an user from his login
-func (c *Client) GetUserByLogin(login string) (*models.User, error) {
+func (c *Client) GetUserByLogin(login, provider string) (*models.User, error) {
 	query := `
 		SELECT id, bio, blog, email, image, location, login, name, last_login, created
-		FROM User
-		WHERE login = $1
+		FROM users
+		WHERE login = $1 AND provider = $2;
 	`
-	u := models.User{}
-	err := c.Connection.QueryRow(query, login).Scan(
+	u := models.User{GHUser: &models.GHUser{}}
+	row := c.Connection.QueryRow(query, login, provider)
+	if row == nil {
+		return nil, errors.New("Not found")
+	}
+
+	if err := row.Scan(
 		&u.ID,
 		&u.Bio,
 		&u.Blog,
@@ -83,6 +90,9 @@ func (c *Client) GetUserByLogin(login string) (*models.User, error) {
 		&u.Name,
 		&u.LastLogin,
 		&u.Created,
-	)
-	return &u, err
+	); err != nil {
+		return nil, err
+	}
+
+	return &u, nil
 }

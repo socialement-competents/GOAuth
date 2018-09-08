@@ -4,19 +4,20 @@ import "time"
 
 // User : an application user
 type User struct {
-	ID        int       `json:"id" db:"id"`
-	LastLogin time.Time `json:"last_login" db:"last_login"`
-	Created   time.Time `json:"created" db:"created"`
+	ID        int       `json:"id"`
+	LastLogin time.Time `json:"last_login"`
+	Created   time.Time `json:"created"`
+	Provider  string    `json:"provider"`
 	*GHUser
 }
 
 // GHUser : a GitHub user
 type GHUser struct {
-	Bio      string `json:"bio" db:"bio"`
-	Blog     string `json:"blog" db:"blog"`
-	Email    string `json:"email" db:"email"`
+	Bio      string `json:"bio"`
+	Blog     string `json:"blog"`
+	Email    string `json:"email"`
 	Image    string `json:"avatar_url" db:"image"`
-	Location string `json:"location" db:"location"`
-	Login    string `json:"login" db:"login"`
-	Name     string `json:"name" db:"name"`
+	Location string `json:"location"`
+	Login    string `json:"login"`
+	Name     string `json:"name"`
 }
