@@ -33,3 +33,53 @@ the GitHub API.
 
 GitHub user API : https://api.github.com/users/:username or 
 https://api.github.com/user with the token in scope
+
+## Installation
+
+**Requirements**
+
+You need to install Go to run this repo.
+You also need a PostgreSQL, local or remote (we used https://elephantsql.com)
+
+**Environment**
+
+Setup the following environment variables:
+
+- `DATABASE_HOST`: database URL
+- `DATABASE_PORT`: database port
+- `DATABASE_USERNAME`: database login
+- `DATABASE_PASSWORD`: database password
+- `DATABASE_DATABASE`: database name
+- `GH_ID`: application ID (found at https://github.com/settings/developers)
+- `GH_SECRET`: application secret (same)
+
+**Database Migrations**
+
+Once everything is set up, you can create the database structure by running
+the migrations:
+
+```
+go run database/migrations/migrate.go database/migrations/queries
+```
+
+You can provide folders or files to the executable, if you want to run only the
+first two migrations, for example, you can do:
+
+```
+go run database/migrations/migrate.go database/migrations/queries/0CreateUserTable.sql database/migrations/queries/1AddBasicColumns.sql
+```
+
+or for a shorter syntax:
+
+```
+cd database/migrations/queries
+go run ../migrate.go 0CreateUserTable.sql 1AddBasicColumns.sql
+```
+
+**Build**
+
+To build all the lambdas, execute `./build.sh`.  
+To build specific lambdas, add arguments: `./build.sh lambda1 lambda2`.
+
+Linux/amd64 executables will be built in `./bin`, and the ready-for-deployment
+`.zip` file will be put in `./dist`.
