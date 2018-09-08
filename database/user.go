@@ -69,7 +69,7 @@ func (c *Client) UpdateUser(u *models.User) error {
 // GetUserByLogin selects an user from his login
 func (c *Client) GetUserByLogin(login, provider string) (*models.User, error) {
 	query := `
-		SELECT id, bio, blog, email, image, location, login, name, last_login, created
+		SELECT id, bio, blog, email, image, location, login, name, provider, last_login, created
 		FROM users
 		WHERE login = $1 AND provider = $2;
 	`
@@ -88,6 +88,7 @@ func (c *Client) GetUserByLogin(login, provider string) (*models.User, error) {
 		&u.Location,
 		&u.Login,
 		&u.Name,
+		&u.Provider,
 		&u.LastLogin,
 		&u.Created,
 	); err != nil {
