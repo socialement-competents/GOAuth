@@ -42,6 +42,7 @@ https://api.github.com/user with the token in scope
 - AWS API Gateway
 - AWS IAM (for permission control)
 - AWS S3 (static hosting)
+- ElephantSQL (PostgreSQL hosting)
 
 **Langages**
 
