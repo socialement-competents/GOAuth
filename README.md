@@ -34,6 +34,18 @@ the GitHub API.
 GitHub user API : https://api.github.com/users/:username or 
 https://api.github.com/user with the token in scope
 
+## Resources
+
+Software used:
+- AWS Lambda
+- AWS API Gateway
+- AWS IAM (for permission control)
+- AWS S3 (static hosting)
+
+Langages used:
+- Golang (lambdas, migrations, database connection)
+- Vue.js (front)
+
 ## Installation
 
 **Requirements**
