@@ -24,6 +24,8 @@ the GitHub API.
 
 ## Resources used
 
+**Documentation**
+
 [Spec](https://tools.ietf.org/html/rfc6749)  
 [Building a Basic Auth Server](https://medium.com/google-cloud/understanding-oauth2-and-building-a-basic-authorization-server-of-your-own-a-beginners-guide-cf7451a16f66)  
 [Go Lambdas](https://github.com/eawsy/aws-lambda-go)
@@ -34,15 +36,15 @@ the GitHub API.
 GitHub user API : https://api.github.com/users/:username or 
 https://api.github.com/user with the token in scope
 
-## Resources
+**Software**
 
-Software used:
 - AWS Lambda
 - AWS API Gateway
 - AWS IAM (for permission control)
 - AWS S3 (static hosting)
 
-Langages used:
+**Langages**
+
 - Golang (lambdas, migrations, database connection)
 - Vue.js (front)
 
