@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -14,56 +15,54 @@ import (
 	"github.com/socialement-competents/goauth/models"
 )
 
-// GHPayload : payload sent by the GitHub API
-type GHPayload struct {
-	Code string `json:"code"`
+// FitBitPayload : payload sent by the FitBit API
+type FitBitPayload struct {
+	UserID    string `json:"user_id"`
+	ExpiresIn int    `json:"expires_in"`
+	*FitBitToken
 }
 
-// GHToken : token given by GitHub in exchange for a Code
-type GHToken struct {
+// FitBitToken : token given by FitBit in exchange for a Code
+type FitBitToken struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	Scope       string `json:"scope"`
 }
 
-const accessTokenURL = "https://github.com/login/oauth/access_token?code=%s&client_id=%s&client_secret=%s"
-const userURL = "https://api.github.com/user"
+// access_token=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyMkQ0RE4iLCJzdWIiOiI1TEdIWUsiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyaHIgcnBybyIsImV4cCI6MTU0MTQwNzIyNywiaWF0IjoxNTQwODAzNTQxfQ.biiNAuvU2FQsf39UbHimeK4amKkI7ARvKhUQoKrC2iQ
+// user_id=5LGHYK
+// scope=heartrate+profile
+// token_type=Bearer
+// expires_in=31536000
+
+// REFRESH TOKEN : curl -X POST -i -H "Authorization: Basic MjJENEROOmMxN2NjMDczMjIzYzEyYmU4ZjUxNTk2OWI4NDcxYzIx" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=refresh_token" -d "refresh_token=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyMkQ0RE4iLCJzdWIiOiI1TEdIWUsiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyaHIgcnBybyIsImV4cCI6MTU0MTQwNzIyNywiaWF0IjoxNTQwODAzNTQxfQ.biiNAuvU2FQsf39UbHimeK4amKkI7ARvKhUQoKrC2iQ" https://api.fitbit.com/oauth2/token
+
+const userURL = "https://api.fitbit.com/1/user/%s/profile.json"
+
+const githubProvider = "fitbit"
 
 var client = &http.Client{}
-var clientID string
 var clientSecret string
 
 func init() {
-	clientID = os.Getenv("GH_ID")
-	clientSecret = os.Getenv("GH_SECRET")
+	clientSecret = os.Getenv("FITBIT_SECRET")
 }
 
-// HandleCallback : handles the GitHub callback when calling "Connect with GitHub"
-func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	if clientID == "" {
-		return respond(http.StatusBadRequest, "$GH_ID should be set")
-	}
+// FitBitCallback : handles the FitBit callback when calling "Connect with FitBit"
+func FitBitCallback(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	if clientSecret == "" {
-		return respond(http.StatusBadRequest, "$GH_ID should be set")
+		return respond(http.StatusBadRequest, "$FITBIT_SECRET should be set")
 	}
 
-	payload, err := getCode(&request)
-	if err != nil {
-		return respond(
-			http.StatusBadRequest,
-			fmt.Sprintf("error getting the code from the payload: %v", err),
-		)
-	}
-
-	token, err := getAccessToken(payload)
+	payload, err := parseRequest(&request)
 	if err != nil {
 		return respond(
 			http.StatusInternalServerError,
-			fmt.Sprintf("error getting the access token from GH: %v", err),
+			fmt.Sprintf("error getting the access token from FitBit: %v", err),
 		)
 	}
 
-	ghuser, err := getUser(token)
+	fitbituser, err := getUser(payload.FitBitToken, payload.UserID)
 	if err != nil {
 		return respond(
 			http.StatusInternalServerError,
@@ -79,17 +78,17 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 		)
 	}
 
-	user, err := dbClient.GetUserByLogin(ghuser.Login, models.GithubProvider)
+	user, err := dbClient.GetUserByIdentifier("fitbit_id", fitbituser.EncodedID)
 	exists := true
 	if err != nil {
 		// the user doesn't exist, we will have to create it
 		exists = false
-		user = &models.User{Provider: models.GithubProvider}
+		user = &models.User{Provider: githubProvider}
 	}
 
 	// Update our database with the newly fetched info
-	// (we don't query api.github.com every time, because of rate limits)
-	user.GHUser = ghuser
+	// (we don't query the FitBit API every time, because of rate limits)
+	user.FitBitUser = fitbituser
 	user.LastLogin = time.Now()
 
 	var (
@@ -131,8 +130,8 @@ func HandleCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 	return respond(statusCode, string(jsonBytes))
 }
 
-func getCode(request *events.APIGatewayProxyRequest) (*GHPayload, error) {
-	var payload GHPayload
+func parseRequest(request *events.APIGatewayProxyRequest) (*FitBitPayload, error) {
+	var payload FitBitPayload
 	data, err := json.Marshal(request.QueryStringParameters)
 	if err != nil {
 		return nil, err
@@ -142,18 +141,13 @@ func getCode(request *events.APIGatewayProxyRequest) (*GHPayload, error) {
 	return &payload, err
 }
 
-func getAccessToken(payload *GHPayload) (*GHToken, error) {
-	url := fmt.Sprintf(
-		accessTokenURL,
-		payload.Code,
-		clientID,
-		clientSecret,
-	)
+func getUser(token *FitBitToken, userID string) (*models.FitBitUser, error) {
+	url := fmt.Sprintf(userURL, userID)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("%s %s", token.TokenType, token.AccessToken))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -164,35 +158,18 @@ func getAccessToken(payload *GHPayload) (*GHToken, error) {
 		return nil, err
 	}
 
-	var token GHToken
-	err = json.NewDecoder(resp.Body).Decode(&token)
-	return &token, err
-}
-
-func getUser(token *GHToken) (*models.GHUser, error) {
-	req, err := http.NewRequest(http.MethodGet, userURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Authorization", fmt.Sprintf("token %s", token.AccessToken))
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = checkStatusCode(resp); err != nil {
-		return nil, err
-	}
-
-	var user models.GHUser
+	var user models.FitBitUser
 	err = json.NewDecoder(resp.Body).Decode(&user)
+	raw, err := ioutil.ReadAll(resp.Body)
+	if err == nil {
+		user.RawPayload = string(raw)
+	}
 	return &user, err
 }
 
 func checkStatusCode(resp *http.Response) error {
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("bad GitHub response: %s", resp.Status)
+		return fmt.Errorf("bad FitBit response: %s", resp.Status)
 	} else if resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected return code: %s", resp.Status)
 	}
@@ -208,5 +185,5 @@ func respond(code int, payload interface{}) (events.APIGatewayProxyResponse, err
 }
 
 func main() {
-	lambda.Start(HandleCallback)
+	lambda.Start(FitBitCallback)
 }

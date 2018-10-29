@@ -14,12 +14,23 @@ the GitHub API.
 
 ## Flow
 
+**Github**
+
 1. Display a HTML file with a `Login with GitHub` button
 2. Call `https://github.com/login/oauth/authorize` on click
 3. GitHub calls back on our AWS API Gateway, acting as a proxy to a lambda
 4. The `handlecallback` lambda gets triggered with a `code`
 5. Use this `code` to get an access token at `https://github.com/login/oauth/access_token`
 6. Use this access token to get the authenticated user at `https://api.github.com/user`
+7. Store the user info in our database
+
+**FitBit**
+
+1. Display a HTML file with a `Login with FitBit` button
+2. Call `https://www.fitbit.com/oauth2/authorize` on click
+3. FitBit calls back on our AWS API Gateway, acting as a proxy to a lambda
+4. The `fitbitCallback` lambda gets triggered with an access token and an user ID
+6. Use this access token to get the authenticated user at `https://api.fitbit.com/1/user/${USER_ID}/profile.json`
 7. Store the user info in our database
 
 ## Resources used
