@@ -11,11 +11,13 @@ import (
 func (c *Client) CreateUser(u *models.User) (int, error) {
 	query := `
 		INSERT INTO users (bio, blog, email, image, location, login, name, fitbit_age, fitbit_avatar150, fitbit_id, fitbit_fullname, fitbit_json_payload, provider, last_login, created)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING id;
 	`
 
 	u.Created = time.Now()
+
+	u.RemoveNils()
 
 	id := 0
 	err := c.Connection.QueryRow(
@@ -61,6 +63,8 @@ func (c *Client) UpdateUser(u *models.User) error {
 		WHERE id = $1;
 	`
 
+	u.RemoveNils()
+
 	_, err := c.Connection.Exec(
 		query,
 		u.ID,
@@ -89,10 +93,9 @@ func (c *Client) GetUserByIdentifier(column, id string) (*models.User, error) {
 		FROM users
 		WHERE $1 = $2;
 	`
-	u := models.User{
-		GHUser:     &models.GHUser{},
-		FitBitUser: &models.FitBitUser{},
-	}
+	u := models.User{}
+	u.RemoveNils()
+
 	row := c.Connection.QueryRow(query, column, id)
 	if row == nil {
 		return nil, errors.New("Not found")

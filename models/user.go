@@ -35,6 +35,17 @@ type FitBitUser struct {
 	RawPayload string `json:"raw_payload" db:"fitbit_json_payload"`
 }
 
+// RemoveNils remove the nil fields
+func (u *User) RemoveNils() {
+	if u.GHUser == nil {
+		u.GHUser = &GHUser{}
+	}
+
+	if u.FitBitUser == nil {
+		u.FitBitUser = &FitBitUser{}
+	}
+}
+
 // GetUniqueIdentifier returns the unique of the user no matter the provider (email / ID / login / ...)
 func (u *User) GetUniqueIdentifier() (string, error) {
 	switch {

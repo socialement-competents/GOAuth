@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -29,14 +33,6 @@ type FitBitToken struct {
 	Scope       string `json:"scope"`
 }
 
-// access_token=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyMkQ0RE4iLCJzdWIiOiI1TEdIWUsiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyaHIgcnBybyIsImV4cCI6MTU0MTQwNzIyNywiaWF0IjoxNTQwODAzNTQxfQ.biiNAuvU2FQsf39UbHimeK4amKkI7ARvKhUQoKrC2iQ
-// user_id=5LGHYK
-// scope=heartrate+profile
-// token_type=Bearer
-// expires_in=31536000
-
-// REFRESH TOKEN : curl -X POST -i -H "Authorization: Basic MjJENEROOmMxN2NjMDczMjIzYzEyYmU4ZjUxNTk2OWI4NDcxYzIx" -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=refresh_token" -d "refresh_token=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyMkQ0RE4iLCJzdWIiOiI1TEdIWUsiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyaHIgcnBybyIsImV4cCI6MTU0MTQwNzIyNywiaWF0IjoxNTQwODAzNTQxfQ.biiNAuvU2FQsf39UbHimeK4amKkI7ARvKhUQoKrC2iQ" https://api.fitbit.com/oauth2/token
-
 const userURL = "https://api.fitbit.com/1/user/%s/profile.json"
 
 const githubProvider = "fitbit"
@@ -54,7 +50,7 @@ func FitBitCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 		return respond(http.StatusBadRequest, "$FITBIT_SECRET should be set")
 	}
 
-	payload, err := parseRequest(&request)
+	payload, err := parsePath(request.QueryStringParameters)
 	if err != nil {
 		return respond(
 			http.StatusInternalServerError,
@@ -130,15 +126,30 @@ func FitBitCallback(ctx context.Context, request events.APIGatewayProxyRequest) 
 	return respond(statusCode, string(jsonBytes))
 }
 
-func parseRequest(request *events.APIGatewayProxyRequest) (*FitBitPayload, error) {
-	var payload FitBitPayload
-	data, err := json.Marshal(request.QueryStringParameters)
+func parsePath(p map[string]string) (*FitBitPayload, error) {
+	ttl, err := strconv.Atoi(p["expires_in"])
 	if err != nil {
-		return nil, err
+		log.Println("INVALID TTL: ", p["expires_in"])
+		ttl = 575867
 	}
 
-	err = json.Unmarshal(data, &payload)
-	return &payload, err
+	log.Print("Scope: " + p["scope"])
+
+	fbp := &FitBitPayload{
+		ExpiresIn: ttl,
+		UserID:    p["user_id"],
+		FitBitToken: &FitBitToken{
+			AccessToken: p["access_token"],
+			TokenType:   p["token_type"],
+			Scope:       p["scope"],
+		},
+	}
+
+	if !strings.Contains(fbp.Scope, "heartrate") {
+		return nil, errors.New("the heartrate scope is required - scope: " + fbp.Scope)
+	}
+
+	return fbp, nil
 }
 
 func getUser(token *FitBitToken, userID string) (*models.FitBitUser, error) {
