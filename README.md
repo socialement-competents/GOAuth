@@ -28,8 +28,9 @@ the GitHub API.
 
 1. Display a HTML file with a `Login with FitBit` button
 2. Call `https://www.fitbit.com/oauth2/authorize` on click
-3. FitBit calls back on our AWS API Gateway, acting as a proxy to a lambda
-4. The `fitbitCallback` lambda gets triggered with an access token and an user ID
+3. FitBit calls back on `proxyFitbit/index.html`, to change the `#` into a `?` in the URL 
+4. `proxyFitbit/index.html` redirects to API Gateway
+5. The `fitbitCallback` lambda gets triggered with an access token and an user ID
 6. Use this access token to get the authenticated user at `https://api.fitbit.com/1/user/${USER_ID}/profile.json`
 7. Store the user info in our database
 

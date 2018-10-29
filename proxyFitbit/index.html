@@ -1,0 +1,16 @@
+<html>
+  <head>
+    <title>Proxy FitBit OAuth Callback</title>
+  </head>
+  <body onload="proxyRequest()">
+  <h1>Proxying the request ...</h1>
+  <script>
+    function proxyRequest() {
+      window.location.replace(
+        'https://9t9bln4c36.execute-api.eu-central-1.amazonaws.com/default/fitbitCallback?' +
+        location.href.split('#')[1]
+      )
+    }
+  </script>
+</body>
+</html>
